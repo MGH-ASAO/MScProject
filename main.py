@@ -1,3 +1,4 @@
+import sklearn
 import torch
 import numpy as np
 import matplotlib.pyplot as plt
@@ -7,7 +8,8 @@ print(f"PyTorch version: {torch.__version__}")
 print(f"CUDA available: {torch.cuda.is_available()}")
 
 # Load a small portion of MNIST dataset
-mnist = fetch_openml('mnist_784', version=1, as_frame=False, parser='auto')
+# Set the parser to 'liac-arff' to avoid needing pandas
+mnist = fetch_openml('mnist_784', version=1, as_frame=False, parser='liac-arff')
 X, y = mnist.data[:1000], mnist.target[:1000]
 
 # Display a sample image

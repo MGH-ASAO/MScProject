@@ -1,123 +1,209 @@
+import os
+import sys
 import torch
-import torch.nn as nn
-import torch.optim as optim
-import torchvision.transforms as transforms
-import torchvision.datasets as datasets
+import torch.nn.functional as F
+import torchvision
+from scipy.stats import entropy
+from torchvision import datasets, transforms
 from torch.utils.data import DataLoader
 import numpy as np
-import random
+from scipy import linalg
+from tqdm import tqdm
 
-def set_seed(seed):
-    torch.manual_seed(seed)
-    torch.cuda.manual_seed_all(seed)
-    np.random.seed(seed)
-    random.seed(seed)
-    torch.backends.cudnn.deterministic = True
-    torch.backends.cudnn.benchmark = False
+# 添加项目根目录到 Python 路径
+project_root = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+sys.path.append(project_root)
 
-set_seed(42)
+from handwritten_digit_generation.models.gan import Generator as GANGenerator
+from handwritten_digit_generation.models.vae import ConvVAE
+from handwritten_digit_generation.models.normalizing_flow import NormalizingFlow
+from handwritten_digit_generation.models.diffusion import DiffusionModel
+from handwritten_digit_generation.utils.file_utils import save_to_results
 
-class RealNVPCouplingLayer(nn.Module):
-    def __init__(self, input_dim, hidden_dim):
-        super(RealNVPCouplingLayer, self).__init__()
-        self.scale_net = nn.Sequential(
-            nn.Linear(input_dim // 2, hidden_dim),
-            nn.ReLU(),
-            nn.Linear(hidden_dim, input_dim // 2)
-        )
-        self.translate_net = nn.Sequential(
-            nn.Linear(input_dim // 2, hidden_dim),
-            nn.ReLU(),
-            nn.Linear(hidden_dim, input_dim // 2)
-        )
-        # Initialize weights
-        self._initialize_weights()
+# 设置设备
+device = torch.device("mps" if torch.backends.mps.is_available() else "cpu")
 
-    def _initialize_weights(self):
-        for m in self.modules():
-            if isinstance(m, nn.Linear):
-                nn.init.kaiming_normal_(m.weight, mode='fan_in', nonlinearity='relu')
-                if m.bias is not None:
-                    nn.init.constant_(m.bias, 0)
 
-    def forward(self, x, reverse=False):
-        x_a, x_b = x.chunk(2, dim=1)
-        if reverse:
-            scale = self.scale_net(x_a)
-            translate = self.translate_net(x_a)
-            x_b = (x_b - translate) * torch.exp(-scale)
-        else:
-            scale = self.scale_net(x_a)
-            translate = self.translate_net(x_a)
-            x_b = x_b * torch.exp(scale) + translate
-        return torch.cat([x_a, x_b], dim=1), scale
+def load_inception_model():
+    inception_model = torchvision.models.inception_v3(weights=torchvision.models.Inception_V3_Weights.IMAGENET1K_V1)
+    inception_model.fc = torch.nn.Identity()
+    inception_model = inception_model.to(device)
+    inception_model.eval()
+    return inception_model
 
-class RealNVP(nn.Module):
-    def __init__(self, input_dim, hidden_dim, num_coupling_layers):
-        super(RealNVP, self).__init__()
-        self.coupling_layers = nn.ModuleList([RealNVPCouplingLayer(input_dim, hidden_dim) for _ in range(num_coupling_layers)])
 
-    def forward(self, x, reverse=False):
-        log_det_jacobian = 0
-        if reverse:
-            for layer in reversed(self.coupling_layers):
-                x, scale = layer(x, reverse)
-                log_det_jacobian -= scale.sum(dim=1)
-        else:
-            for layer in self.coupling_layers:
-                x, scale = layer(x)
-                log_det_jacobian += scale.sum(dim=1)
-        return x, log_det_jacobian
+def calculate_fid(real_features, fake_features):
+    mu1, sigma1 = real_features.mean(axis=0), np.cov(real_features, rowvar=False)
+    mu2, sigma2 = fake_features.mean(axis=0), np.cov(fake_features, rowvar=False)
 
-# Update the transformation pipeline
-transform = transforms.Compose([
-    transforms.ToTensor(),
-    transforms.Normalize((0.5,), (0.5,)),  # Normalize the images to [-1, 1]
-    transforms.Lambda(lambda x: x.view(-1))  # Flatten the images
-])
+    ssdiff = np.sum((mu1 - mu2) ** 2.0)
+    covmean = linalg.sqrtm(sigma1.dot(sigma2))
 
-train_dataset = datasets.MNIST(root='./data', train=True, transform=transform, download=True)
-test_dataset = datasets.MNIST(root='./data', train=False, transform=transform, download=True)
+    if np.iscomplexobj(covmean):
+        covmean = covmean.real
 
-train_loader = DataLoader(train_dataset, batch_size=128, shuffle=True)
-test_loader = DataLoader(test_dataset, batch_size=128, shuffle=False)
+    fid = ssdiff + np.trace(sigma1 + sigma2 - 2.0 * covmean)
+    return fid
 
-def loss_fn(z, log_det_jacobian):
-    prior_log_prob = -0.5 * torch.sum(z ** 2 + torch.log(torch.tensor(2 * torch.pi)), dim=1)
-    return -(prior_log_prob + log_det_jacobian).mean()
 
-device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
-model = RealNVP(input_dim=784, hidden_dim=512, num_coupling_layers=8).to(device)
-optimizer = optim.Adam(model.parameters(), lr=1e-4, weight_decay=1e-5)  # Add weight decay (L2 regularization)
+def calculate_inception_score(pred, num_splits=10, eps=1e-16):
+    scores = []
+    for i in range(num_splits):
+        part = pred[i * (len(pred) // num_splits): (i + 1) * (len(pred) // num_splits), :]
+        py = np.mean(part, axis=0)
+        scores.append(np.exp(np.mean(np.sum(part * (np.log(part + eps) - np.log(py + eps)), axis=1))))
+    return np.mean(scores), np.std(scores)
 
-scheduler = optim.lr_scheduler.StepLR(optimizer, step_size=10, gamma=0.5)  # Add learning rate scheduler
 
-def train(epoch):
-    model.train()
-    train_loss = 0
-    for batch_idx, (data, _) in enumerate(train_loader):
-        data = data.to(device)
-        optimizer.zero_grad()
-        z, log_det_jacobian = model(data)
-        loss = loss_fn(z, log_det_jacobian)
-        loss.backward()
-        train_loss += loss.item()
-        optimizer.step()
-    print(f'Epoch {epoch}, Loss: {train_loss / len(train_loader.dataset)}')
-    scheduler.step()
-
-def test():
+def generate_samples(model, model_type, num_samples=10000):
     model.eval()
-    test_loss = 0
+    samples = []
     with torch.no_grad():
-        for data, _ in test_loader:
-            data = data.to(device)
-            z, log_det_jacobian = model(data)
-            loss = loss_fn(z, log_det_jacobian)
-            test_loss += loss.item()
-    print(f'Test Loss: {test_loss / len(test_loader.dataset)}')
+        for _ in tqdm(range(num_samples // 100), desc=f"Generating {model_type} samples"):
+            if model_type == 'gan':
+                z = torch.randn(100, 100).to(device)
+                sample = model(z)
+            elif model_type == 'vae':
+                z = torch.randn(100, model.latent_dim).to(device)
+                sample = model.decode(z)
+            elif model_type == 'normalizing_flow':
+                z = torch.randn(100, 784).to(device)
+                sample = model.inverse(z)
+                sample = sample.view(-1, 1, 28, 28)
+            elif model_type == 'diffusion':
+                sample = model.sample(100, device)
 
-for epoch in range(1, 31):  # Increase the number of epochs
-    train(epoch)
+            samples.append(sample.cpu())
 
-test()
+    samples = torch.cat(samples, dim=0)
+    return samples
+
+
+def preprocess_samples(samples, model_type):
+    if model_type == 'diffusion':
+        samples = (samples + 1) / 2  # 假设 Diffusion 模型输出范围是 [-1, 1]
+    samples = torch.clamp(samples, 0, 1)
+    return samples
+
+
+def preprocess_for_inception(images):
+    images = F.interpolate(images, size=(299, 299), mode='bilinear', align_corners=False)
+    images = images.repeat(1, 3, 1, 1)
+    images = images * 2 - 1  # 将 [0, 1] 范围转换为 [-1, 1]
+    return images
+
+
+def debug_output(tensor, name):
+    print(f"{name} - Shape: {tensor.shape}")
+    print(f"{name} - Min: {tensor.min().item():.4f}, Max: {tensor.max().item():.4f}")
+    print(f"{name} - Mean: {tensor.mean().item():.4f}, Std: {tensor.std().item():.4f}")
+
+
+def evaluate_models():
+    # 加载数据集
+    transform = transforms.Compose([
+        transforms.ToTensor(),
+        transforms.Normalize((0.5,), (0.5,))
+    ])
+    test_dataset = datasets.MNIST(root=os.path.join(project_root, 'data'), train=False, download=True,
+                                  transform=transform)
+    test_loader = DataLoader(test_dataset, batch_size=100, shuffle=False)
+
+    # 加载 Inception 模型
+    inception_model = load_inception_model()
+
+    # 加载生成模型
+    latent_dim = 100
+    img_shape = (1, 28, 28)
+
+    # gan_generator = GANGenerator(latent_dim, img_shape).to(device)
+    # gan_generator.load_state_dict(
+    #     torch.load(save_to_results('gan_generator.pth', subdirectory='gan'), map_location=device))
+    #
+    # vae = ConvVAE(latent_dim=32).to(device)
+    # vae.load_state_dict(torch.load(save_to_results('vae_model.pth', subdirectory='vae'), map_location=device))
+
+    normalizing_flow = NormalizingFlow(dim=784, n_flows=16).to(device)
+    normalizing_flow.load_state_dict(
+        torch.load(save_to_results('best_normalizing_flow_model.pth', subdirectory='normalizing_flow'),
+                   map_location=device))
+
+    # diffusion = DiffusionModel(input_channels=1, time_dim=256, hidden_dim=64, device=device).to(device)
+    # diffusion.load_state_dict(
+    #     torch.load(save_to_results('diffusion_model.pth', subdirectory='diffusion'), map_location=device))
+
+    models = {
+        # 'gan': gan_generator,
+        # 'vae': vae,
+        'normalizing_flow': normalizing_flow,
+        # 'diffusion': diffusion
+    }
+
+    # 计算真实数据的特征
+    real_features = []
+    for images, _ in tqdm(test_loader, desc="Processing real images"):
+        images = images.to(device)
+        images = preprocess_for_inception(images)
+        with torch.no_grad():
+            features = inception_model(images).cpu().numpy()
+        real_features.append(features)
+    real_features = np.concatenate(real_features, axis=0)
+
+    results = {}
+
+    for model_name, model in models.items():
+        print(f"\nEvaluating {model_name}...")
+
+        # 生成样本
+        generated_samples = generate_samples(model, model_name)
+        generated_samples = preprocess_samples(generated_samples, model_name)
+
+        debug_output(generated_samples, f"{model_name} generated samples")
+
+        # 计算生成样本的特征
+        fake_features = []
+        fake_preds = []
+        for i in tqdm(range(0, len(generated_samples), 100), desc=f"Processing {model_name} generated images"):
+            batch = generated_samples[i:i + 100].to(device)
+            batch = preprocess_for_inception(batch)
+            with torch.no_grad():
+                features = inception_model(batch).cpu().numpy()
+                preds = F.softmax(inception_model(batch), dim=1).cpu().numpy()
+            fake_features.append(features)
+            fake_preds.append(preds)
+        fake_features = np.concatenate(fake_features, axis=0)
+        fake_preds = np.concatenate(fake_preds, axis=0)
+
+        # 计算 FID
+        fid = calculate_fid(real_features, fake_features)
+
+        # 计算 Inception Score
+        is_mean, is_std = calculate_inception_score(fake_preds)
+
+        results[model_name] = {
+            'FID': fid,
+            'IS_mean': is_mean,
+            'IS_std': is_std
+        }
+
+        # 保存生成的样本
+        torchvision.utils.save_image(generated_samples[:100],
+                                     save_to_results(f'{model_name}_samples.png', subdirectory=model_name),
+                                     nrow=10, normalize=True)
+
+    # 打印结果
+    for model_name, scores in results.items():
+        print(f"\nResults for {model_name}:")
+        print(f"FID: {scores['FID']:.2f}")
+        print(f"Inception Score: {scores['IS_mean']:.2f} ± {scores['IS_std']:.2f}")
+
+    # 保存结果到文件
+    with open(save_to_results('evaluation_results.txt', subdirectory='evaluation'), 'w') as f:
+        for model_name, scores in results.items():
+            f.write(f"Results for {model_name}:\n")
+            f.write(f"FID: {scores['FID']:.2f}\n")
+            f.write(f"Inception Score: {scores['IS_mean']:.2f} ± {scores['IS_std']:.2f}\n\n")
+
+
+if __name__ == "__main__":
+    evaluate_models()
