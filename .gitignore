@@ -4,3 +4,9 @@ __pycache__/
 .idea/
 # 忽略所有 .pth 文件
 *.pth
+# 忽略 MNIST 数据集
+*.ubyte
+*.gz
+
+# 忽略所有大模型文件
+*.pth
