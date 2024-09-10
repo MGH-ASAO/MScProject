@@ -22,3 +22,12 @@
 # 忽略大二进制文件
 *.dylib
 *.so.venv/
+
+handwritten_digit_generation/results/**/*.pth
+
+handwritten_digit_generation/results/vae/tensorboard_logs/*.tfevents
+
+data/MNIST/raw/*.ubyte
+
+
+.venv/
