@@ -37,30 +37,30 @@ def get_real_images():
 def main():
     real_images = get_real_images()
 
-    # 评估 CNN
+    # Evaluate CNN
     cnn_accuracy, cnn_class_correct, cnn_class_total = evaluate_cnn()
     print(f"CNN overall accuracy: {cnn_accuracy:.2f}%")
 
-    # 评估 Diffusion model
+    # Evaluate Diffusion model
     diffusion_mse = evaluate_diffusion()
     print(f"Diffusion model average MSE: {diffusion_mse:.4f}")
 
-    # 评估 GAN
+    # Evaluate GAN
     gan_real_score, gan_fake_score = evaluate_gan()
     print(f"GAN average discriminator score for real images: {gan_real_score:.4f}")
     print(f"GAN average discriminator score for fake images: {gan_fake_score:.4f}")
 
-    # 评估 Normalizing Flow
+    # Evaluate Normalizing Flow
     nf_log_likelihood, nf_mse = evaluate_normalizing_flow()
     print(f"Normalizing Flow average log-likelihood: {nf_log_likelihood:.4f}")
     print(f"Normalizing Flow average MSE: {nf_mse:.4f}")
 
-    # 评估 VAE
+    # Evaluate VAE
     vae_loss, vae_mse = evaluate_vae()
     print(f"VAE average loss: {vae_loss:.4f}")
     print(f"VAE average MSE: {vae_mse:.4f}")
 
-    # 可视化比较
+    # Visual comparison
     plot_comparison(real_images,
                     save_to_results('diffusion_samples.png', subdirectory='diffusion'),
                     save_to_results('gan_generated_images.png', subdirectory='gan'),

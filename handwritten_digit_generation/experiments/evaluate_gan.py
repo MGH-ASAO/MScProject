@@ -20,7 +20,6 @@ print(f"Using device: {device}")
 
 
 def evaluate_gan():
-    # 加载测试数据
     transform = transforms.Compose([
         transforms.ToTensor(),
         transforms.Normalize((0.5,), (0.5,))
@@ -29,7 +28,7 @@ def evaluate_gan():
                                   transform=transform)
     test_loader = DataLoader(test_dataset, batch_size=1000, shuffle=False)
 
-    # 加载模型
+#Load model
     latent_dim = 100
     img_shape = (1, 28, 28)
     generator = Generator(latent_dim, img_shape).to(device)
@@ -44,18 +43,17 @@ def evaluate_gan():
     generator.eval()
     discriminator.eval()
 
-    # 生成图像
+# Generate image
     n_samples = 25
     z = torch.randn(n_samples, latent_dim).to(device)
     with torch.no_grad():
         generated_images = generator(z)
 
-    # 保存生成的图像
     grid = torchvision.utils.make_grid(generated_images.cpu(), nrow=5, normalize=True)
     samples_path = save_to_results('gan_generated_images.png', subdirectory='gan')
     torchvision.utils.save_image(grid, samples_path)
 
-    # 评估生成器和判别器
+# Evaluate generator and discriminator
     total_fake_score = 0
     total_real_score = 0
     n_evaluated = 0
@@ -96,11 +94,10 @@ def evaluate_gan():
 
     interpolated_images = torch.cat(interpolated_images, dim=0)
 
-    # 保存插值图像
+# Save the interpolated image
     grid = torchvision.utils.make_grid(interpolated_images, nrow=10, normalize=True)
     torchvision.utils.save_image(grid, save_to_results('gan_latent_interpolation.png', subdirectory='gan'))
 
-    # 保存评估结果
     result_path = save_to_results('gan_evaluation_result.txt', subdirectory='gan')
     with open(result_path, 'w') as f:
         f.write(f'Average discriminator score for real images: {avg_real_score:.4f}\n')

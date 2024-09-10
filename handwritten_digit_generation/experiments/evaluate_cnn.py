@@ -19,7 +19,6 @@ print(f"Using device: {device}")
 
 
 def evaluate_cnn():
-    # 加载测试数据
     transform = transforms.Compose([
         transforms.ToTensor(),
         transforms.Normalize((0.1307,), (0.3081,))
@@ -28,7 +27,6 @@ def evaluate_cnn():
                                   transform=transform)
     test_loader = DataLoader(test_dataset, batch_size=1000, shuffle=False)
 
-    # 加载模型
     model = CNN().to(device)
     model_path = save_to_results('cnn_model.pth', subdirectory='cnn')
     model.load_state_dict(torch.load(model_path, map_location=device, weights_only=True))
@@ -64,11 +62,10 @@ def evaluate_cnn():
         class_accuracy = 100 * class_correct[i] / class_total[i]
         print(f'Accuracy of {i}: {class_accuracy:.2f}%')
 
-    # 绘制混淆矩阵
+    # Draw confusion matrix
     cm_path = save_to_results('cnn_confusion_matrix.png', subdirectory='cnn')
     plot_confusion_matrix(all_labels, all_preds, cm_path)
 
-    # 保存结果
     result_path = save_to_results('cnn_evaluation_result.txt', subdirectory='cnn')
     with open(result_path, 'w') as f:
         f.write(f'Overall accuracy: {accuracy:.2f}%\n')

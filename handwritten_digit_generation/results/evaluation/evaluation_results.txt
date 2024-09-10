@@ -1,0 +1,16 @@
+Results for gan:
+FID: 40.96
+Inception Score: 1.05 ± 0.00
+
+Results for vae:
+FID: 87.14
+Inception Score: 1.05 ± 0.00
+
+Results for normalizing_flow:
+FID: 263.15
+Inception Score: 1.03 ± 0.00
+
+Results for diffusion:
+FID: 306.74
+Inception Score: 1.02 ± 0.00
+

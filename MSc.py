@@ -113,27 +113,27 @@ def evaluate_models():
     latent_dim = 100
     img_shape = (1, 28, 28)
 
-    # gan_generator = GANGenerator(latent_dim, img_shape).to(device)
-    # gan_generator.load_state_dict(
-    #     torch.load(save_to_results('gan_generator.pth', subdirectory='gan'), map_location=device))
-    #
-    # vae = ConvVAE(latent_dim=32).to(device)
-    # vae.load_state_dict(torch.load(save_to_results('vae_model.pth', subdirectory='vae'), map_location=device))
+    gan_generator = GANGenerator(latent_dim, img_shape).to(device)
+    gan_generator.load_state_dict(
+        torch.load(save_to_results('gan_generator.pth', subdirectory='gan'), map_location=device))
+
+    vae = ConvVAE(latent_dim=32).to(device)
+    vae.load_state_dict(torch.load(save_to_results('vae_model.pth', subdirectory='vae'), map_location=device))
 
     normalizing_flow = NormalizingFlow(dim=784, n_flows=16).to(device)
     normalizing_flow.load_state_dict(
         torch.load(save_to_results('best_normalizing_flow_model.pth', subdirectory='normalizing_flow'),
                    map_location=device))
 
-    # diffusion = DiffusionModel(input_channels=1, time_dim=256, hidden_dim=64, device=device).to(device)
-    # diffusion.load_state_dict(
-    #     torch.load(save_to_results('diffusion_model.pth', subdirectory='diffusion'), map_location=device))
+    diffusion = DiffusionModel(input_channels=1, time_dim=256, hidden_dim=64, device=device).to(device)
+    diffusion.load_state_dict(
+        torch.load(save_to_results('diffusion_model.pth', subdirectory='diffusion'), map_location=device))
 
     models = {
-        # 'gan': gan_generator,
-        # 'vae': vae,
+        'gan': gan_generator,
+        'vae': vae,
         'normalizing_flow': normalizing_flow,
-        # 'diffusion': diffusion
+        'diffusion': diffusion
     }
 
     real_features = []
@@ -156,7 +156,7 @@ def evaluate_models():
 
         debug_output(generated_samples, f"{model_name} generated samples")
 
-        # 计算生成样本的特征
+        # Calculate the characteristics of the generated sample
         fake_features = []
         fake_preds = []
         for i in tqdm(range(0, len(generated_samples), 100), desc=f"Processing {model_name} generated images"):

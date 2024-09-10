@@ -87,7 +87,8 @@ def main():
                 optimizer_D.step()
 
                 if i % 100 == 0:
-                    print_progress(epoch, CONFIG['n_epochs'], i, len(train_loader), d_loss.item(), g_loss.item())
+                    # Assuming that the print_progress function needs only 5 arguments
+                    print_progress(epoch, CONFIG['n_epochs'], i, d_loss.item(), g_loss.item())
 
             logging.info(
                 f'Epoch {epoch + 1}/{CONFIG["n_epochs"]}, D loss: {d_loss.item():.4f}, G loss: {g_loss.item():.4f}')
@@ -105,7 +106,7 @@ def main():
                 'generator': generator.state_dict(),
                 'discriminator': discriminator.state_dict(),
                 'optimizer_G': optimizer_G.state_dict(),
-                'optimizer_D': optimizer_D.state_dict(),
+                'optimizer_D': optimizer_D.state,
             }, save_to_results(f'gan_checkpoint_epoch_{epoch + 1}.pth', subdirectory='gan'))
 
         torch.save(generator.state_dict(), save_to_results('gan_generator.pth', subdirectory='gan'))
@@ -116,7 +117,7 @@ def main():
         logging.exception("An error occurred:")
         torch.save({
             'epoch': epoch,
-            'generator': generator.state_dict(),
+            'generator': generator.state,
             'discriminator': discriminator.state_dict(),
             'optimizer_G': optimizer_G.state_dict(),
             'optimizer_D': optimizer_D.state_dict(),

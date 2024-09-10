@@ -1,0 +1,4 @@
+Average MSE: 0.2767
+Average SSIM: 0.2300
+Generated samples saved to /Users/mgh/Downloads/LX/Nottingham/Spring Semester/Msc project/Msc Project/handwritten_digit_generation/results/diffusion/diffusion_generated_samples_mse_ssim.png
+Reconstruction comparison saved to /Users/mgh/Downloads/LX/Nottingham/Spring Semester/Msc project/Msc Project/handwritten_digit_generation/results/diffusion/diffusion_reconstruction_comparison.png

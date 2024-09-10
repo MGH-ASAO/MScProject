@@ -1,0 +1,3 @@
+Average discriminator score for real images: 0.5454
+Average discriminator score for fake images: 0.4163
+Generated images saved to /Users/mgh/Downloads/LX/Nottingham/Spring Semester/Msc project/Msc Project/handwritten_digit_generation/results/gan/gan_generated_images.png

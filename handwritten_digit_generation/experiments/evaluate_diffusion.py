@@ -125,7 +125,7 @@ def evaluate_diffusion():
     is_mean, is_std = calculate_inception_score(fake_preds)
 
     # Save results
-    result_path = save_to_results('diffusion_evaluation_result.txt', subdirectory='diffusion')
+    result_path = save_to_results('diffusion_evaluation_fid_is_result.txt', subdirectory='diffusion')
 
     n_steps = 10
     x1 = torch.randn(1, 1, 28, 28, device=device)
@@ -141,7 +141,7 @@ def evaluate_diffusion():
 
     interpolated_images = torch.cat(interpolated_images, dim=0)
 
-    # 保存插值图像
+# Save the interpolated image
     grid = torchvision.utils.make_grid(interpolated_images, nrow=n_steps, normalize=True)
     torchvision.utils.save_image(grid, save_to_results('diffusion_noise_interpolation.png', subdirectory='diffusion'))
 
@@ -161,142 +161,136 @@ if __name__ == "__main__":
 
 # handwritten_digit_generation/experiments/evaluate_diffusion.py
 
-# import os
-# import sys
-# import torch
-# from torchvision import datasets, transforms
-# from torch.utils.data import DataLoader
-# import numpy as np
-# import matplotlib.pyplot as plt
-# from skimage.metrics import structural_similarity as ssim
-#
-# from handwritten_digit_generation.utils.training_utils import T
-#
-# project_root = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
-# sys.path.append(project_root)
-#
-# from handwritten_digit_generation.models.diffusion import DiffusionModel, betas, alphas_cumprod, posterior_variance
-# from handwritten_digit_generation.utils.file_utils import save_to_results, get_project_root
-# from handwritten_digit_generation.utils.visualization import plot_confusion_matrix
-#
-# device = torch.device("mps" if torch.backends.mps.is_available() else "cpu")
-# print(f"Using device: {device}")
-#
-# def sample_from_model(model, n_samples=16, device=device):
-#     model.eval()
-#     with torch.no_grad():
-#         x = torch.randn((n_samples, 1, 28, 28)).to(device)
-#         for i in reversed(range(T)):
-#             t = torch.full((n_samples,), i, device=device, dtype=torch.long)
-#             noise_pred = model(x, t)
-#             if noise_pred.dim() == 2:
-#                 noise_pred = noise_pred.view(-1, 1, 28, 28)
-#             x = x - betas[i] * noise_pred / torch.sqrt(1 - alphas_cumprod[i])
-#             if i > 0:
-#                 noise = torch.randn_like(x)
-#                 x = x + torch.sqrt(posterior_variance[i]) * noise
-#     model.train()
-#     x = torch.clamp(x, -1, 1)
-#     return x.cpu()
-#
-#
-# def visualize_reconstruction(original, reconstructed, n_samples=5):
-#     fig, axes = plt.subplots(2, n_samples, figsize=(n_samples * 2, 4))
-#     for i in range(n_samples):
-#         axes[0, i].imshow(original[i].squeeze().cpu().numpy(), cmap='gray')
-#         axes[0, i].axis('off')
-#         axes[0, i].set_title('Original')
-#
-#         axes[1, i].imshow(reconstructed[i].squeeze().cpu().numpy(), cmap='gray')
-#         axes[1, i].axis('off')
-#         axes[1, i].set_title('Reconstructed')
-#
-#     plt.tight_layout()
-#     reconstruction_path = save_to_results('diffusion_reconstruction_comparison.png', subdirectory='diffusion')
-#     plt.savefig(reconstruction_path)
-#     plt.close()
-#     return reconstruction_path
-#
-#
-#
-# def evaluate_diffusion():
-#     # 加载测试数据
-#     transform = transforms.Compose([
-#         transforms.ToTensor(),
-#         transforms.Normalize((0.1307,), (0.3081,))
-#     ])
-#     test_dataset = datasets.MNIST(root=os.path.join(project_root, 'data'), train=False, download=True,
-#                                   transform=transform)
-#     test_loader = DataLoader(test_dataset, batch_size=1000, shuffle=False)
-#
-#     # 加载模型
-#     input_dim = 784
-#     model = DiffusionModel(input_channels=1, time_dim=256, hidden_dim=64, device=device).to(device)
-#     model_path = save_to_results('diffusion_model.pth', subdirectory='diffusion')
-#     model.load_state_dict(torch.load(model_path, map_location=device))
-#     model.eval()
-#
-#     # 生成样本
-#     n_samples = 16
-#     samples = sample_from_model(model, n_samples)
-#
-#     # 绘制生成的样本
-#     fig, axes = plt.subplots(4, 4, figsize=(10, 10))
-#     for i, ax in enumerate(axes.flatten()):
-#         ax.imshow(samples[i].squeeze().numpy(), cmap='gray')  # 直接使用 .numpy()
-#         ax.axis('off')
-#
-#     plt.tight_layout()
-#
-#     # 保存结果
-#     samples_path = save_to_results('diffusion_generated_samples.png', subdirectory='diffusion')
-#     plt.savefig(samples_path)
-#     plt.close()
-#
-#     # 计算重构误差和SSIM
-#     total_mse = 0
-#     total_ssim = 0
-#     n_evaluated = 0
-#
-#     with torch.no_grad():
-#         for images, _ in test_loader:
-#             images = images.to(device)
-#             reconstructed = sample_from_model(model, images.size(0))
-#
-#             # 确保值域一致
-#             images = (images + 1) / 2  # 从[-1, 1]转换到[0, 1]
-#             reconstructed = (reconstructed + 1) / 2
-#
-#             mse = torch.mean((images.cpu() - reconstructed) ** 2)
-#             total_mse += mse.item() * images.size(0)
-#
-#             # 计算SSIM
-#             for i in range(images.size(0)):
-#                 orig = images[i].squeeze().cpu().numpy()
-#                 recon = reconstructed[i].squeeze().numpy()
-#                 total_ssim += ssim(orig, recon, data_range=1)
-#
-#             n_evaluated += images.size(0)
-#
-#     avg_mse = total_mse / n_evaluated
-#     avg_ssim = total_ssim / n_evaluated
-#     print(f'Average MSE: {avg_mse:.4f}')
-#     print(f'Average SSIM: {avg_ssim:.4f}')
-#
-#     # 在评估函数中调用
-#     reconstruction_path = visualize_reconstruction(images[:5], reconstructed[:5])
-#
-#     # 保存评估结果
-#     result_path = save_to_results('diffusion_evaluation_result.txt', subdirectory='diffusion')
-#     with open(result_path, 'w') as f:
-#         f.write(f'Average MSE: {avg_mse:.4f}\n')
-#         f.write(f'Average SSIM: {avg_ssim:.4f}\n')
-#         f.write(f"Generated samples saved to {samples_path}\n")
-#         f.write(f"Reconstruction comparison saved to {reconstruction_path}\n")
-#
-#     print(f"Evaluation results saved to {result_path}")
-#
-#     return avg_mse, avg_ssim
-#
-# if __name__ == "__main__":
-#     evaluate_diffusion()
+import os
+import sys
+import torch
+from torchvision import datasets, transforms
+from torch.utils.data import DataLoader
+import numpy as np
+import matplotlib.pyplot as plt
+from skimage.metrics import structural_similarity as ssim
+
+from handwritten_digit_generation.utils.training_utils import T
+
+project_root = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+sys.path.append(project_root)
+
+from handwritten_digit_generation.models.diffusion import DiffusionModel, betas, alphas_cumprod, posterior_variance
+from handwritten_digit_generation.utils.file_utils import save_to_results, get_project_root
+from handwritten_digit_generation.utils.visualization import plot_confusion_matrix
+
+device = torch.device("mps" if torch.backends.mps.is_available() else "cpu")
+print(f"Using device: {device}")
+
+def sample_from_model(model, n_samples=16, device=device):
+    model.eval()
+    with torch.no_grad():
+        x = torch.randn((n_samples, 1, 28, 28)).to(device)
+        for i in reversed(range(T)):
+            t = torch.full((n_samples,), i, device=device, dtype=torch.long)
+            noise_pred = model(x, t)
+            if noise_pred.dim() == 2:
+                noise_pred = noise_pred.view(-1, 1, 28, 28)
+            x = x - betas[i] * noise_pred / torch.sqrt(1 - alphas_cumprod[i])
+            if i > 0:
+                noise = torch.randn_like(x)
+                x = x + torch.sqrt(posterior_variance[i]) * noise
+    model.train()
+    x = torch.clamp(x, -1, 1)
+    return x.cpu()
+
+
+def visualize_reconstruction(original, reconstructed, n_samples=5):
+    fig, axes = plt.subplots(2, n_samples, figsize=(n_samples * 2, 4))
+    for i in range(n_samples):
+        axes[0, i].imshow(original[i].squeeze().cpu().numpy(), cmap='gray')
+        axes[0, i].axis('off')
+        axes[0, i].set_title('Original')
+
+        axes[1, i].imshow(reconstructed[i].squeeze().cpu().numpy(), cmap='gray')
+        axes[1, i].axis('off')
+        axes[1, i].set_title('Reconstructed')
+
+    plt.tight_layout()
+    reconstruction_path = save_to_results('diffusion_reconstruction_comparison.png', subdirectory='diffusion')
+    plt.savefig(reconstruction_path)
+    plt.close()
+    return reconstruction_path
+
+
+
+def evaluate_diffusion():
+    transform = transforms.Compose([
+        transforms.ToTensor(),
+        transforms.Normalize((0.1307,), (0.3081,))
+    ])
+    test_dataset = datasets.MNIST(root=os.path.join(project_root, 'data'), train=False, download=True,
+                                  transform=transform)
+    test_loader = DataLoader(test_dataset, batch_size=1000, shuffle=False)
+
+    input_dim = 784
+    model = DiffusionModel(input_channels=1, time_dim=256, hidden_dim=64, device=device).to(device)
+    model_path = save_to_results('diffusion_model.pth', subdirectory='diffusion')
+    model.load_state_dict(torch.load(model_path, map_location=device))
+    model.eval()
+
+    n_samples = 16
+    samples = sample_from_model(model, n_samples)
+
+    # Draw the generated samples
+    fig, axes = plt.subplots(4, 4, figsize=(10, 10))
+    for i, ax in enumerate(axes.flatten()):
+        ax.imshow(samples[i].squeeze().numpy(), cmap='gray')  # 直接使用 .numpy()
+        ax.axis('off')
+
+    plt.tight_layout()
+
+    samples_path = save_to_results('diffusion_generated_samples_mse_ssim.png', subdirectory='diffusion')
+    plt.savefig(samples_path)
+    plt.close()
+
+    # Calculate reconstruction error and SSIM
+    total_mse = 0
+    total_ssim = 0
+    n_evaluated = 0
+
+    with torch.no_grad():
+        for images, _ in test_loader:
+            images = images.to(device)
+            reconstructed = sample_from_model(model, images.size(0))
+
+            # Make sure the value ranges are consistent
+            images = (images + 1) / 2  # Convert from [-1, 1] to [0, 1]
+            reconstructed = (reconstructed + 1) / 2
+
+            mse = torch.mean((images.cpu() - reconstructed) ** 2)
+            total_mse += mse.item() * images.size(0)
+
+            # calculate SSIM
+            for i in range(images.size(0)):
+                orig = images[i].squeeze().cpu().numpy()
+                recon = reconstructed[i].squeeze().numpy()
+                total_ssim += ssim(orig, recon, data_range=1)
+
+            n_evaluated += images.size(0)
+
+    avg_mse = total_mse / n_evaluated
+    avg_ssim = total_ssim / n_evaluated
+    print(f'Average MSE: {avg_mse:.4f}')
+    print(f'Average SSIM: {avg_ssim:.4f}')
+
+    reconstruction_path = visualize_reconstruction(images[:5], reconstructed[:5])
+
+    result_path = save_to_results('diffusion_evaluation_mse_ssim_result.txt', subdirectory='diffusion')
+    with open(result_path, 'w') as f:
+        f.write(f'Average MSE: {avg_mse:.4f}\n')
+        f.write(f'Average SSIM: {avg_ssim:.4f}\n')
+        f.write(f"Generated samples saved to {samples_path}\n")
+        f.write(f"Reconstruction comparison saved to {reconstruction_path}\n")
+
+    print(f"Evaluation results saved to {result_path}")
+
+    return avg_mse, avg_ssim
+
+if __name__ == "__main__":
+    evaluate_diffusion()

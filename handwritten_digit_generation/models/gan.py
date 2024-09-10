@@ -45,7 +45,7 @@ class Discriminator(nn.Module):
         validity = self.model(img_flat)
         return validity
 
-# 添加一个辅助函数来创建模型并将其移动到指定设备
+# Add a helper function to create the model and move it to the specified device
 def create_models(latent_dim, img_shape, device):
     generator = Generator(latent_dim, img_shape).to(device)
     discriminator = Discriminator(img_shape).to(device)

@@ -41,7 +41,7 @@ class DiffusionModel(nn.Module):
 
         self.conv_out = nn.Conv2d(hidden_dim, input_channels, 3, padding=1)
 
-        # 将预计算的张量移动到正确的设备上
+        # Move precomputed tensors to the correct device
         self.sqrt_recip_alphas = sqrt_recip_alphas.view(-1).to(self.device)
         self.alphas_cumprod_prev = alphas_cumprod_prev.view(-1).to(self.device)
         self.alphas_cumprod = alphas_cumprod.view(-1).to(self.device)
@@ -53,14 +53,14 @@ class DiffusionModel(nn.Module):
         # print("Input x shape:", x.shape)
         # print("Input t shape:", t.shape)
 
-        # 检查输入是否是 2D，如果是，重塑为 4D
+        # Check if the input is 2D, if so, reshape it to 4D
         if x.dim() == 2:
-            x = x.view(x.size(0), 1, 28, 28)  # 假设输入是 MNIST 图像（28x28）
+            x = x.view(x.size(0), 1, 28, 28)  # Assume the input is a MNIST image (28x28)
 
-        # 保存原始形状
+        # Save original shape
         original_shape = x.shape
 
-        # 确保 t 是二维的
+        # Make sure t is two-dimensional
         if t.dim() == 1:
             t = t.unsqueeze(-1)
 
@@ -72,7 +72,7 @@ class DiffusionModel(nn.Module):
         x2 = self.down1(F.max_pool2d(x1, 2))
         x3 = self.down2(F.max_pool2d(x2, 2))
 
-        # 调整 time_emb 的形状以匹配 x3
+        # Adjust the shape of time_emb to match x3
         time_emb = time_emb.unsqueeze(-1).unsqueeze(-1).expand(-1, -1, x3.shape[2], x3.shape[3])
 
         x3 = torch.cat([x3, time_emb], dim=1)
@@ -87,7 +87,7 @@ class DiffusionModel(nn.Module):
 
         x = self.conv_out(x)
 
-        # 如果原始输入是 2D，将输出重新展平
+        # If the original input is 2D, re-flatten the output
         if original_shape[1] == 784:
             x = x.view(x.size(0), -1)
 
@@ -95,7 +95,7 @@ class DiffusionModel(nn.Module):
 
     def sample(self, num_samples, device, T=300):
         # print("Starting sampling process")
-        # 生成初始噪声
+        # Generate initial noise
         x = torch.randn((num_samples, 1, 28, 28)).to(device)
 
         for i in reversed(range(T)):
@@ -144,7 +144,7 @@ def get_index_from_list(vals, t, x_shape):
 
 
 def forward_diffusion_sample(x_0, t, device="cpu"):
-    # 如果输入是 4D，将其展平
+    # If the input is 4D, flatten it
     original_shape = x_0.shape
     if len(original_shape) == 4:
         x_0 = x_0.view(x_0.shape[0], -1)
@@ -156,7 +156,7 @@ def forward_diffusion_sample(x_0, t, device="cpu"):
     x_noisy = sqrt_alphas_cumprod_t.to(device) * x_0.to(device) \
               + sqrt_one_minus_alphas_cumprod_t.to(device) * noise.to(device)
 
-    # 如果原始输入是 4D，将结果重塑回原始形状
+    # If the original input was 4D, reshape the result back to the original shape
     if len(original_shape) == 4:
         x_noisy = x_noisy.view(original_shape)
         noise = noise.view(original_shape)

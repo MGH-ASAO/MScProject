@@ -1,0 +1,11 @@
+Overall accuracy: 99.45%
+Accuracy of 0: 99.90%
+Accuracy of 1: 99.82%
+Accuracy of 2: 99.42%
+Accuracy of 3: 99.70%
+Accuracy of 4: 99.69%
+Accuracy of 5: 99.33%
+Accuracy of 6: 99.27%
+Accuracy of 7: 99.32%
+Accuracy of 8: 99.28%
+Accuracy of 9: 98.71%

@@ -22,7 +22,7 @@ logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(
 parser = argparse.ArgumentParser(description='Train VAE model')
 parser.add_argument('--batch_size', type=int, default=128, help='input batch size')
 parser.add_argument('--lr', type=float, default=1e-4, help='learning rate')
-parser.add_argument('--epochs', type=int, default=200, help='number of epochs to train')
+parser.add_argument('--epochs', type=int, default=100, help='number of epochs to train')
 parser.add_argument('--save_interval', type=int, default=10, help='save model every n epochs')
 parser.add_argument('--latent_dim', type=int, default=32, help='dimension of latent space')
 parser.add_argument('--beta', type=float, default=0.1, help='beta value for beta-VAE')
@@ -31,7 +31,7 @@ args = parser.parse_args()
 CONFIG = {
     'batch_size': args.batch_size,
     'lr': args.lr,
-    'n_epochs': args.epochs,
+    'n_epochs': 200,
     'save_interval': args.save_interval,
     'device': torch.device("mps" if torch.backends.mps.is_available() else "cpu"),
     'latent_dim': args.latent_dim,

@@ -20,7 +20,7 @@ class CNN(nn.Module):
         x = self.dropout1(x)
         x = torch.flatten(x, 1)
         x = F.relu(self.fc1(x))
-        x = self.dropout2(x)  # 2D 输入
+        x = self.dropout2(x)  # 2D input
         x = self.fc2(x)
         return F.log_softmax(x, dim=1)
 

@@ -8,22 +8,22 @@ import numpy as np
 
 @contextlib.contextmanager
 def to_cpu(model):
-    """临时将模型移到CPU的上下文管理器"""
+    """Temporarily move the model to the CPU's context manager"""
     device = next(model.parameters()).device
     model.cpu()
     yield model
     model.to(device)
 
 def print_progress(epoch, n_epochs, batch, n_batches, loss):
-    """打印训练进度"""
+    """Print training progress"""
     logging.info(f"[Epoch {epoch + 1}/{n_epochs}] [Batch {batch + 1}/{n_batches}] [Loss: {loss:.4f}]")
 
 def preprocess(x):
-    """将输入数据预处理到 [-1, 1] 范围内"""
+    """Preprocess input data to the range [-1, 1]"""
     return (x.view(x.size(0), -1) / 255.0 - 0.5) * 2
 
 def validate(model, dataloader, compute_loss, device):
-    """验证模型性能"""
+    """Verify model performance"""
     model.eval()
     total_loss = 0
     with torch.no_grad():
@@ -35,12 +35,12 @@ def validate(model, dataloader, compute_loss, device):
     return total_loss / len(dataloader)
 
 def save_checkpoint(state, filename):
-    """保存检查点"""
+    """Save checkpoint"""
     torch.save(state, filename)
     logging.info(f"Checkpoint saved to {filename}")
 
 def load_checkpoint(model, optimizer, filename, device):
-    """加载检查点"""
+    """Load checkpoint"""
     checkpoint = torch.load(filename, map_location=device)
     model.load_state_dict(checkpoint['model'])
     optimizer.load_state_dict(checkpoint['optimizer'])
@@ -49,18 +49,18 @@ def load_checkpoint(model, optimizer, filename, device):
     return start_epoch
 
 def get_device():
-    """获取可用的设备"""
+    """Get available devices"""
     return torch.device("mps" if torch.backends.mps.is_available() else "cpu")
 
 def set_seed(seed):
-    """设置随机种子以确保可重复性"""
+    """Set a random seed to ensure repeatability"""
     torch.manual_seed(seed)
     if torch.cuda.is_available():
         torch.cuda.manual_seed_all(seed)
     np.random.seed(seed)
 
 class EarlyStopping:
-    """早停机制"""
+    """Early stopping mechanism"""
     def __init__(self, patience=7, verbose=False, delta=0):
         self.patience = patience
         self.verbose = verbose
