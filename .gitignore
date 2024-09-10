@@ -1,12 +1,21 @@
-__pycache__/
-*.pyc
-.DS_Store
-.idea/
-# 忽略所有 .pth 文件
+# 忽略模型文件
 *.pth
-# 忽略 MNIST 数据集
+
+# 忽略二进制数据文件
 *.ubyte
 *.gz
 
-# 忽略所有大模型文件
-*.pth
+# 忽略图片文件
+*.png
+*.jpg
+*.jpeg
+
+# 忽略 tensorboard 日志文件
+*.tfevents
+
+# 忽略 Pycharm 的项目配置文件
+.idea/
+
+# 忽略虚拟环境文件夹
+.venv/
+
