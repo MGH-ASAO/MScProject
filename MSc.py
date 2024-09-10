@@ -10,7 +10,7 @@ import numpy as np
 from scipy import linalg
 from tqdm import tqdm
 
-# 添加项目根目录到 Python 路径
+
 project_root = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 sys.path.append(project_root)
 
@@ -20,7 +20,7 @@ from handwritten_digit_generation.models.normalizing_flow import NormalizingFlow
 from handwritten_digit_generation.models.diffusion import DiffusionModel
 from handwritten_digit_generation.utils.file_utils import save_to_results
 
-# 设置设备
+
 device = torch.device("mps" if torch.backends.mps.is_available() else "cpu")
 
 
@@ -100,7 +100,6 @@ def debug_output(tensor, name):
 
 
 def evaluate_models():
-    # 加载数据集
     transform = transforms.Compose([
         transforms.ToTensor(),
         transforms.Normalize((0.5,), (0.5,))
@@ -109,10 +108,8 @@ def evaluate_models():
                                   transform=transform)
     test_loader = DataLoader(test_dataset, batch_size=100, shuffle=False)
 
-    # 加载 Inception 模型
     inception_model = load_inception_model()
 
-    # 加载生成模型
     latent_dim = 100
     img_shape = (1, 28, 28)
 
@@ -139,7 +136,6 @@ def evaluate_models():
         # 'diffusion': diffusion
     }
 
-    # 计算真实数据的特征
     real_features = []
     for images, _ in tqdm(test_loader, desc="Processing real images"):
         images = images.to(device)
@@ -154,7 +150,7 @@ def evaluate_models():
     for model_name, model in models.items():
         print(f"\nEvaluating {model_name}...")
 
-        # 生成样本
+
         generated_samples = generate_samples(model, model_name)
         generated_samples = preprocess_samples(generated_samples, model_name)
 
@@ -174,10 +170,10 @@ def evaluate_models():
         fake_features = np.concatenate(fake_features, axis=0)
         fake_preds = np.concatenate(fake_preds, axis=0)
 
-        # 计算 FID
+        # Calculate FID
         fid = calculate_fid(real_features, fake_features)
 
-        # 计算 Inception Score
+        # Calculate Inception Score
         is_mean, is_std = calculate_inception_score(fake_preds)
 
         results[model_name] = {
@@ -186,18 +182,18 @@ def evaluate_models():
             'IS_std': is_std
         }
 
-        # 保存生成的样本
+        # Save the generated sample
         torchvision.utils.save_image(generated_samples[:100],
                                      save_to_results(f'{model_name}_samples.png', subdirectory=model_name),
                                      nrow=10, normalize=True)
 
-    # 打印结果
+    # print results
     for model_name, scores in results.items():
         print(f"\nResults for {model_name}:")
         print(f"FID: {scores['FID']:.2f}")
         print(f"Inception Score: {scores['IS_mean']:.2f} ± {scores['IS_std']:.2f}")
 
-    # 保存结果到文件
+    # Save results to file
     with open(save_to_results('evaluation_results.txt', subdirectory='evaluation'), 'w') as f:
         for model_name, scores in results.items():
             f.write(f"Results for {model_name}:\n")

@@ -16,7 +16,7 @@ logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(
 CONFIG = {
     'batch_size': 128,
     'lr': 1e-4,
-    'n_epochs': 300,
+    'n_epochs': 400,
     'device': torch.device("mps" if torch.backends.mps.is_available() else "cpu"),
     'input_dim': 784,
     'n_flows': 16,
@@ -102,7 +102,7 @@ def main():
 
         logging.info(f'Epoch {epoch}: Train Loss: {train_loss:.4f}, Validation Loss: {val_loss:.4f}')
 
-        # 保存检查点
+        # Save checkpoint
         torch.save({
             'epoch': epoch,
             'model': model.state_dict(),

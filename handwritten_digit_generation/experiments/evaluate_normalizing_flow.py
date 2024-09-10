@@ -132,7 +132,7 @@ def evaluate_normalizing_flow(model_path, batch_size=256):
 
     interpolated_samples = torch.cat(interpolated_samples, dim=0)
 
-    # 保存插值图像
+    # Save the interpolated image
     grid = torchvision.utils.make_grid(interpolated_samples.view(-1, 1, 28, 28), nrow=n_samples, normalize=True)
     torchvision.utils.save_image(grid, save_to_results('normalizing_flow_latent_interpolation.png',
                                                        subdirectory='normalizing_flow'))
