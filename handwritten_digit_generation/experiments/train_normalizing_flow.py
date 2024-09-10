@@ -1,5 +1,4 @@
 import os
-
 import torch
 import torch.optim as optim
 from torch.utils.data import DataLoader
@@ -58,6 +57,36 @@ def validate(model, val_loader, device):
             total_loss += loss.item()
     return total_loss / len(val_loader)
 
+def load_checkpoint(model, optimizer, checkpoint_path, device):
+    if os.path.exists(checkpoint_path):
+        logging.info(f"Loading checkpoint from {checkpoint_path}")
+        checkpoint = torch.load(checkpoint_path, map_location=device)
+        if 'model' in checkpoint and 'optimizer' in checkpoint and 'epoch' in checkpoint:
+            try:
+                model.load_state_dict(checkpoint['model'])
+                optimizer.load_state_dict(checkpoint['optimizer'])
+                start_epoch = checkpoint['epoch'] + 1
+                logging.info(f"Resuming training from epoch {start_epoch}")
+                return start_epoch
+            except RuntimeError as e:
+                logging.warning(f"Could not load checkpoint due to: {e}")
+                logging.info("Starting training from scratch.")
+        else:
+            logging.warning("Checkpoint format not recognized. Starting training from scratch.")
+    else:
+        logging.info("No checkpoint found. Starting training from scratch.")
+    return 0
+
+def save_checkpoint(model, optimizer, epoch, train_loss, val_loss, checkpoint_path):
+    torch.save({
+        'epoch': epoch,
+        'model': model.state_dict(),
+        'optimizer': optimizer.state_dict(),
+        'train_loss': train_loss,
+        'val_loss': val_loss
+    }, checkpoint_path)
+    logging.info(f'Checkpoint saved at epoch {epoch}')
+
 def main():
     transform = transforms.Compose([
         transforms.ToTensor(),
@@ -77,40 +106,17 @@ def main():
 
     checkpoint_path = save_to_results('normalizing_flow_checkpoint.pth', subdirectory='normalizing_flow')
 
-    start_epoch = 0
-    if os.path.exists(checkpoint_path):
-        checkpoint = torch.load(checkpoint_path, map_location=CONFIG['device'])
-        if 'model' in checkpoint:
-            try:
-                model.load_state_dict(checkpoint['model'])
-                optimizer.load_state_dict(checkpoint['optimizer'])
-                start_epoch = checkpoint['epoch'] + 1
-                logging.info(f"Resuming training from epoch {start_epoch}")
-            except RuntimeError as e:
-                logging.warning(f"Could not load old checkpoint due to model architecture change: {e}")
-                logging.info("Starting training from scratch with the new model architecture.")
-        else:
-            logging.warning("Checkpoint format not recognized. Starting training from scratch.")
-    else:
-        logging.info("No checkpoint found. Starting training from scratch.")
+    start_epoch = load_checkpoint(model, optimizer, checkpoint_path, CONFIG['device'])
 
     best_loss = float('inf')
-    for epoch in range(1, CONFIG['n_epochs'] + 1):
+    for epoch in range(start_epoch, CONFIG['n_epochs'] + 1):
         train_loss = train_flow(model, train_loader, optimizer, CONFIG['device'])
         val_loss = validate(model, val_loader, CONFIG['device'])
         scheduler.step()
 
         logging.info(f'Epoch {epoch}: Train Loss: {train_loss:.4f}, Validation Loss: {val_loss:.4f}')
 
-        # Save checkpoint
-        torch.save({
-            'epoch': epoch,
-            'model': model.state_dict(),
-            'optimizer': optimizer.state_dict(),
-            'train_loss': train_loss,
-            'val_loss': val_loss
-        }, checkpoint_path)
-        logging.info(f'Checkpoint saved at epoch {epoch}')
+        save_checkpoint(model, optimizer, epoch, train_loss, val_loss, checkpoint_path)
 
         if val_loss < best_loss:
             best_loss = val_loss
